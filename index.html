@@ -349,6 +349,13 @@ Att. Ángel Henríquez</p>
         window.addEventListener('resize', () => {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
+
+            if (isSequenceStarted) {
+                const targetPoints = showHeart
+                    ? getPointsForHeart()
+                    : getPointsForText(messages[messageIndex - 1]);
+                setParticleTargets(targetPoints);
+            }
         });
 
         // Estrellas de fondo
@@ -440,16 +447,44 @@ Att. Ángel Henríquez</p>
             offCanvas.width = width;
             offCanvas.height = height;
 
-            const fontSize = Math.min(width / 6, 100);
-            offCtx.font = `bold ${fontSize}px sans-serif`;
+            const maxTextWidth = width * 0.9;
+            const maxTextHeight = height * 0.58;
+            let fontSize = Math.max(16, Math.min(width / 6, 100, height * 0.18));
+            let lines;
+            let lineHeight;
+
+            do {
+                offCtx.font = `bold ${fontSize}px sans-serif`;
+                lines = [];
+                let currentLine = '';
+
+                text.split(' ').forEach(word => {
+                    const candidate = currentLine ? `${currentLine} ${word}` : word;
+                    if (currentLine && offCtx.measureText(candidate).width > maxTextWidth) {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = candidate;
+                    }
+                });
+                if (currentLine) lines.push(currentLine);
+                lineHeight = fontSize * 1.2;
+
+                if (lines.length * lineHeight <= maxTextHeight || fontSize <= 16) break;
+                fontSize = Math.max(16, fontSize * 0.9);
+            } while (true);
+
             offCtx.fillStyle = 'white';
             offCtx.textAlign = 'center';
             offCtx.textBaseline = 'middle';
-            offCtx.fillText(text, width / 2, height / 2);
+            lines.forEach((line, index) => {
+                const y = height / 2 + (index - (lines.length - 1) / 2) * lineHeight;
+                offCtx.fillText(line, width / 2, y, maxTextWidth);
+            });
 
             const imageData = offCtx.getImageData(0, 0, width, height).data;
             const points = [];
-            const step = Math.floor(fontSize / 20);
+            const step = Math.max(1, Math.floor(fontSize / 20));
 
             for (let y = 0; y < height; y += step) {
                 for (let x = 0; x < width; x += step) {
@@ -496,6 +531,10 @@ Att. Ángel Henríquez</p>
                 }, 1400);
             }
 
+            setParticleTargets(targetPoints);
+        }
+
+        function setParticleTargets(targetPoints) {
             // Ajustar el número de partículas al mensaje actual
             if (particles.length < targetPoints.length) {
                 while (particles.length < targetPoints.length) {
